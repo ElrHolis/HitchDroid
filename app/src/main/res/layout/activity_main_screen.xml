@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:weightSum="1"
+    style="@android:style/Theme.DeviceDefault.Dialog.NoActionBar">
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="141dp"
+        android:text="unlock"
+        android:id="@+id/unlockBtn"
+        android:layout_weight="0.37"
+        android:background="#8ac674"
+        android:onClick="FullscreenLocker.UnlockDevice"
+        android:layout_gravity="center_vertical" />
+</LinearLayout>
