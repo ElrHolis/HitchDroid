@@ -1,4 +1,4 @@
-package com.ecet1012.c80.hitchdroid.utils;
+package com.ecet1012.c80.hitchdroid.services;
 
 import android.app.Notification;
 import android.app.Service;
@@ -15,8 +15,9 @@ import android.support.v4.app.NotificationCompat;
  */
 
 import com.ecet1012.c80.hitchdroid.R;
+import com.ecet1012.c80.hitchdroid.utils.IntentReceiver;
 
-public class LockerService extends Service {
+public class KeepAwake extends Service {
 
     private BroadcastReceiver _Receiver;
 
@@ -30,7 +31,7 @@ public class LockerService extends Service {
     public int onStartCommand(Intent intent, int flags, int initID) {
         IntentFilter iFilter = new IntentFilter(Intent.ACTION_SCREEN_ON);
         iFilter.addAction(Intent.ACTION_SCREEN_OFF);
-        _Receiver = new LockerReceiver();
+        _Receiver = new IntentReceiver();
         registerReceiver(_Receiver, iFilter);
 
         Notification tNotification = new NotificationCompat.Builder(this)

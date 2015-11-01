@@ -11,7 +11,7 @@ import com.ecet1012.c80.hitchdroid.MainActivity;
  * https://github.com/Joisar/LockScreenApp/blob/master/LockScreenApp/src/com/mehuljoisar/lockscreen/utils/LockscreenIntentReceiver.java
  *
  */
-public class LockerReceiver extends BroadcastReceiver{
+public class IntentReceiver extends BroadcastReceiver{
 
     @Override
     public void onReceive(Context context, Intent intent)
