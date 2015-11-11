@@ -51,7 +51,8 @@
             </intent-filter>
 
         </receiver>
-        <receiver android:name=".DeviceOwnerReceiver"
+        <receiver
+            android:name=".services.DeviceOwnerReceiver"
             android:description="@string/app_name"
             android:label="@string/app_name"
             android:permission="android.permission.BIND_DEVICE_ADMIN">

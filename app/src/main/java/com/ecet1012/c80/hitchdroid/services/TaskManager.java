@@ -6,13 +6,18 @@ import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.hardware.Sensor;
-import android.hardware.SensorManager;
+import android.util.ArrayMap;
+import android.util.Log;
 
 import com.ecet1012.c80.hitchdroid.MainActivity;
-import com.ecet1012.c80.hitchdroid.PowerState;
-import com.ecet1012.c80.hitchdroid.Workers.AccelerometerWorker;
-import com.ecet1012.c80.hitchdroid.Workers.ProximityWorker;
+import com.ecet1012.c80.hitchdroid.power.PowerState;
+
+import com.ecet1012.c80.hitchdroid.task.GenericTask;
+import com.ecet1012.c80.hitchdroid.utils.Settings;
+
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
 
 
 /**
@@ -21,82 +26,144 @@ import com.ecet1012.c80.hitchdroid.Workers.ProximityWorker;
 public class TaskManager extends BroadcastReceiver {
     private static final String TAG = "TaskManager";
 
-    public static final String SENSOR_INTENT = "HitchDroid_SensorCheck";
-    public static final String CAMERA_INTENT = "HitchDroid_CameraCheck";
-    public static final String FINISH_INTENT = "HitchDroid_FinishWakeLock";
+
     public static final String INIT_INTENT = "HitchDroid_InitTaskManager";
 
-    public static final int INTERVAL_SENSOR_DEFAULT = 250;
-    public static final int INTERVAL_CAMERA_DEFAULT = 2000;
-    public static final int INTERVAL_ACCELEROMETER_DEFAULT = 250;
-    public static final int INTERVAL_PROXIMITY_DEFAULT = 5000;
-
-    private static int accelerometerInterval = INTERVAL_SENSOR_DEFAULT;
-    private static int proximityInterval = INTERVAL_SENSOR_DEFAULT;
-    private static int cameraInterval = INTERVAL_CAMERA_DEFAULT;
-
-
-    private static AlarmManager alarmManager;
-
-    private static PendingIntent pendingSensorIntent;
-    private static PendingIntent pendingCameraIntent;
+    private static Map<String, Task> tasks;
 
 
     private static PowerState powerState;
 
 
-    private static Intent sIntent = new Intent(SENSOR_INTENT);
-    private static Intent cIntent = new Intent(CAMERA_INTENT);
+    private static boolean initialized = false;
+
+
 
 
     @Override
     public void onReceive(Context context, Intent intent) {
 
+        Log.d(TAG, "onReceive " + intent.getAction());
+        if (intent.getAction().equals(INIT_INTENT))
+            Initialize();
+        else {
 
-        switch (intent.getAction()) {
-            case SENSOR_INTENT:
-                powerState.AcquireWakeLock(SENSOR_INTENT, PowerState.PARTIAL_WAKE);
-                InitNextSensorAlarm(accelerometerInterval);
+            Task t = tasks.get(intent.getStringExtra("name"));
+            powerState.AcquireWakeLock(t.taskName, PowerState.PARTIAL_WAKE);
+            t.DoTask();
+            if (t.worker.IsTaskFlagSet(Settings.Task.ACTION, Settings.Task.FLAG_ACTION_SPECIAL))
+                t.DoSpecial();
+            if (t.worker.ShouldSetAlarm() && t.worker.GetTaskInterval() > 0)
+                MainActivity.alarmManager.setExact(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + t.worker.GetTaskInterval(), t.GetPendingIntent());
 
-                break;
-            case CAMERA_INTENT:
-
-                InitNextCameraAlarm(cameraInterval);
-                break;
-            case FINISH_INTENT:
-                break;
-            case INIT_INTENT:
-                powerState = MainActivity.powerState;
-                alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-                pendingSensorIntent = PendingIntent.getBroadcast(context, 0, sIntent, PendingIntent.FLAG_UPDATE_CURRENT);
-
-                pendingCameraIntent = PendingIntent.getBroadcast(context, 0, cIntent, PendingIntent.FLAG_UPDATE_CURRENT);
-
-
-                SensorManager sensorManager = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
-                sensorManager.registerListener(new AccelerometerWorker(), sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), accelerometerInterval * 1000);    // 250ms
-                sensorManager.registerListener(new ProximityWorker(), sensorManager.getDefaultSensor(Sensor.TYPE_PROXIMITY), proximityInterval * 1000);       // 1000ms
-
-
-                InitNextSensorAlarm(proximityInterval);
-                InitNextCameraAlarm(cameraInterval);
-
-
-                break;
         }
 
+        powerState.UpdateStatus();
 
     }
 
-    private void InitNextSensorAlarm(int newInterval) {
+    public void Initialize() {
 
-
-        alarmManager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + newInterval, pendingSensorIntent);
-
+        if (initialized)
+            return;
+        initialized = true;
+        powerState = MainActivity.powerState;
+        tasks = new ArrayMap<String, Task>();
+        Log.d(TAG, "Initialized Task Manager");
+        RegisterTasks();
+        InitTasks();
     }
 
-    private void InitNextCameraAlarm(int newInterval) {
+    private void InitTasks() {
+        try {
 
-        alarmManager.setExact(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + newInterval, pendingCameraIntent);
+            for (Map.Entry<String, Task> taskEntry : tasks.entrySet()) {
+                //Log.d(TAG, "INIT_TASK" + taskEntry.getKey());
+                taskEntry.getValue().worker.ScheduleNextAlarm();
+
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            Log.d(TAG, "INIT_TASK " + e.toString());
+        }
+    }
+
+
+    private void RegisterTasks() {
+
+        try {
+            Class[] taskClasses = Settings.Task.class.getClasses();
+            for (Class c : taskClasses) {
+
+                //Log.d(TAG, c.getName() + " registered");
+                tasks.put(c.getSimpleName(), new Task(c));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            Log.d(TAG, e.toString());
+        }
+    }
+
+    public static void SetAlarm(String taskName, int number, boolean isInterval) {
+        if (isInterval)
+            MainActivity.alarmManager.setExact(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + number, tasks.get(taskName).GetPendingIntent());
+        else
+            MainActivity.alarmManager.setExact(AlarmManager.RTC_WAKEUP, number, tasks.get(taskName).GetPendingIntent());
+    }
+
+    public static void CompleteTask(String taskName) {
+        powerState.ReleaseWakeLock(taskName, PowerState.PARTIAL_WAKE);
+    }
+
+
+    private class Task {
+        public String taskName;
+        private Intent intent;
+        private String intentName;
+        private PendingIntent pendingIntent;
+        private Class taskClass;
+        private GenericTask worker;
+
+        public Task(Class taskClass) {
+            try {
+                taskName = taskClass.getSimpleName();
+
+                //Log.d("TASK_MAKE", "NAME " + taskName);
+                this.taskClass = Class.forName((String) taskClass.getField("TASK_CLASS").get(taskClass.getClass()));
+                //Log.d("TASK_MAKE", "CLASS " + taskClass.toString());
+                worker = (GenericTask) this.taskClass.getConstructor().newInstance();
+                //Log.d("TASK_MAKE", "WORKER " + worker.toString());
+                intentName = (String) taskClass.getField("INTENT").get(taskClass.getClass());
+                //Log.d("TASK_MAKE", "INTENT NAME " + intentName);
+                intent = new Intent(this.intentName).putExtra("name", taskName);
+                //Log.d("TASK_MAKE", "INTENT " + intent.toString());
+                pendingIntent = PendingIntent.getBroadcast(MainActivity.mainContext, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+                //Log.d("TASK_MAKE", "PENDING " + pendingIntent.toString());
+            } catch (Exception e) {
+                e.printStackTrace();
+                Log.d(TAG, "TASK " + e.toString());
+            }
+        }
+
+        public String GetName() {
+            return this.taskName;
+        }
+
+        public String GetIntent() {
+            return this.intentName;
+        }
+
+        public PendingIntent GetPendingIntent() {
+            return this.pendingIntent;
+        }
+
+        public void DoTask() {
+            worker.DoTask();
+        }
+
+        public void DoSpecial() {
+            worker.DoSpecial();
+        }
     }
 }

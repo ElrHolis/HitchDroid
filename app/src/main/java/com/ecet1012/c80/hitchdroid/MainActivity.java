@@ -2,20 +2,11 @@ package com.ecet1012.c80.hitchdroid;
 
 import android.app.Activity;
 import android.app.AlarmManager;
-import android.app.PendingIntent;
 import android.app.admin.DevicePolicyManager;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.hardware.Sensor;
-import android.hardware.SensorEvent;
-import android.hardware.SensorEventListener;
-import android.hardware.SensorManager;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Message;
-import android.os.PowerManager;
 import android.provider.Settings;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
@@ -24,23 +15,19 @@ import android.view.WindowManager.LayoutParams;
 import android.os.SystemClock;
 
 
-import com.ecet1012.c80.hitchdroid.Workers.AccelerometerWorker;
-import com.ecet1012.c80.hitchdroid.Workers.ProximityWorker;
+import com.ecet1012.c80.hitchdroid.power.PowerState;
 import com.ecet1012.c80.hitchdroid.services.ActiveNotification;
+import com.ecet1012.c80.hitchdroid.services.DeviceOwnerReceiver;
 import com.ecet1012.c80.hitchdroid.services.TaskManager;
+import com.ecet1012.c80.hitchdroid.utils.CrashHandler;
 
-import java.lang.ref.WeakReference;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
 
     public static final String TAG_WAKE = "HitchDroid_WakeLock";
 
-
-    public static final String STATE_SLEEP = "HitchDroid_Sleep";                //Need to conserve as much battery as possible, really really don't want be to be here. < 50% battery.
-    public static final String STATE_LOW_BATTERY = "HitchDroid_LowBattery";     //if battery is not 100% we start cutting back on how often we do things.
-    public static final String STATE_NOMINAL = "HitchDroid_Nominal";            //everything is nice and peachy here.
-    public static final String STATE_INTERACTING = "HitchDroid_Interacting";    //screen on and interacting with a user.
 
     public static String activeState;
 
@@ -51,6 +38,7 @@ public class MainActivity extends AppCompatActivity {
 
 
     public static PowerState powerState;
+    public static AlarmManager alarmManager;
     private static CrashHandler crashHandler;
 
     public static Context mainContext;
@@ -64,6 +52,8 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main_screen);
 
         powerState = new PowerState();
+        alarmManager = (AlarmManager) getSystemService(ALARM_SERVICE);
+
 
         crashHandler = new CrashHandler();
         //Thread.setDefaultUncaughtExceptionHandler(crashHandler);
@@ -129,8 +119,7 @@ public class MainActivity extends AppCompatActivity {
                         | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         );
         Log.d(TAG, "onResume");
-        activeState = STATE_INTERACTING;
-        sendBroadcast(new Intent(activeState));
+
     }
 
     @Override
@@ -139,9 +128,10 @@ public class MainActivity extends AppCompatActivity {
         /**if (activityManager != null)
          activityManager.moveTaskToFront( this.getTaskId(), 0);*/
         Log.d(TAG, "onPause");
+        List<String> s = powerState.GetAwakeLocks();
+        for (String str : s)
+            Log.d(TAG, str);
 
-        activeState = STATE_NOMINAL;
-        sendBroadcast(new Intent(activeState));
     }
 
 

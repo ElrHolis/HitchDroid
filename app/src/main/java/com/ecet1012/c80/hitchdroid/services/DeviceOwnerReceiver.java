@@ -1,13 +1,14 @@
-package com.ecet1012.c80.hitchdroid;
+package com.ecet1012.c80.hitchdroid.services;
 
-import android.app.Activity;
 import android.app.admin.DeviceAdminReceiver;
 import android.app.admin.DevicePolicyManager;
-import android.support.v7.app.AppCompatActivity;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.util.Log;
+
+import com.ecet1012.c80.hitchdroid.MainActivity;
+import com.ecet1012.c80.hitchdroid.R;
 
 
 /**

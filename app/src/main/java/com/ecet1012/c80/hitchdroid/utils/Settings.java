@@ -33,11 +33,11 @@ public class Settings {
 
         public static final byte FLAG_BATTERY_EXTREME_TEMP = 0b1000000;
         public static final byte FLAG_BATTERY_STATUS_ERROR = 0b0100000;
-        public static final byte FLAG_BATTERY_FULL = 0b0010000;
-        public static final byte FLAG_BATTERY_GREAT = 0b0001000;
-        public static final byte FLAG_BATTERY_HIGH = 0b0000100;
-        public static final byte FLAG_BATTERY_LOW = 0b0000010;
-        public static final byte FLAG_BATTERY_CRITICAL = 0b0000001;
+        public static final byte FLAG_BATTERY_FULL = 0b0010000;             // 99 < bat
+        public static final byte FLAG_BATTERY_GREAT = 0b0001000;            // 80 < bat < 99
+        public static final byte FLAG_BATTERY_HIGH = 0b0000100;             // 50 < bat < 80
+        public static final byte FLAG_BATTERY_LOW = 0b0000010;              // 20 < bat < 50
+        public static final byte FLAG_BATTERY_CRITICAL = 0b0000001;         //      bat < 20%
 
         public static final byte FLAG_ACTION_CAN_WAKE = 0b1000000;
         public static final byte FLAG_ACTION_RUN_AT_INTERVAL = 0b0100000;
@@ -50,7 +50,7 @@ public class Settings {
         public static class Accelerometer {
             public static final String TASK_CLASS = "com.ecet1012.c80.hitchdroid.task.Accelerometer";
             public static final String INTENT = "HitchDroid_Accelerometer";
-            public static final int[] INTERVAL = {OFF, SEC, OFF, OFF, OFF};
+            public static final int[] INTERVAL = {SEC, SEC, OFF, OFF, OFF};
             public static final byte BATTERY_FLAGS = 0b1111100;
             public static final byte ACTION_FLAGS = 0b1100010;
 

@@ -1,10 +1,12 @@
-package com.ecet1012.c80.hitchdroid;
+package com.ecet1012.c80.hitchdroid.utils;
 
 
 import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+
+import com.ecet1012.c80.hitchdroid.MainActivity;
 
 import java.util.List;
 

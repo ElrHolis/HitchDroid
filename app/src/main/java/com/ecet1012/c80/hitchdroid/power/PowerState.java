@@ -1,10 +1,20 @@
-package com.ecet1012.c80.hitchdroid;
+package com.ecet1012.c80.hitchdroid.power;
 
+import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.os.BatteryManager;
 import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
+import android.os.SystemClock;
 import android.util.Log;
 
+
+import com.ecet1012.c80.hitchdroid.MainActivity;
+import com.ecet1012.c80.hitchdroid.services.TaskManager;
+import com.ecet1012.c80.hitchdroid.utils.Settings;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,13 +31,36 @@ public class PowerState {
     public static final String DIM_WAKE = "dim";
     public static final String BRIGHT_WAKE = "bright";
 
+    public static final String SCHEME_NOMINAL_NAME = "nominal";
+    public static final String SCHEME_DISCHARGING_NAME = "discharging";
+    public static final String SCHEME_BATTERY_HIGH_NAME = "batteryHigh";
+    public static final String SCHEME_BATTERY_LOW_NAME = "batteryLow";
+    public static final String SCHEME_MINIMAL_NAME = "minimal";
+    public static final String SCHEME_SLEEP_NAME = "sleep";
 
+    private static int STATE_CURRENT;
+
+    public static final int STATE_AWAKE = 0;
+    public static final int STATE_IDLE_SHORT = 1;
+    public static final int STATE_IDLE_MID = 2;
+    public static final int STATE_IDLE_LONG = 3;
+    public static final int STATE_NIGHT = 4;
+
+    private static TaskManager taskManager;
     private static PowerManager powerManager;
+
+
     private static WakeLock partialWakeLock;
     private static WakeLock dimWakeLock;
     private static WakeLock brightWakeLock;
-
     private static WakeLock updateWakeLock;
+
+    private static PowerReport currentReport;
+
+
+    public static long lastStatusUpdate = 0;
+
+    private static final long minUpdateInterval = Settings.MIN * 15;
 
     private List<WakeHolder> wakeHolders;
 
@@ -35,19 +68,60 @@ public class PowerState {
     private static String activeWakeLock = NO_WAKE;
 
     public PowerState() {
+        STATE_CURRENT = STATE_AWAKE;
         powerManager = (PowerManager) MainActivity.mainContext.getSystemService(Context.POWER_SERVICE);
         partialWakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKE);
         dimWakeLock = powerManager.newWakeLock(PowerManager.SCREEN_DIM_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP, WAKE);
         brightWakeLock = powerManager.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP, WAKE);
 
         updateWakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKE);
-        CheckPowerStatus();
+
+        InitBatterStatusReceiver();
+        UpdateStatus();
+
+
+
         wakeHolders = new ArrayList<WakeHolder>();
     }
 
-    public PowerReport CheckPowerStatus() {
 
-        return new PowerReport();
+    public int GetState() {
+        return STATE_CURRENT;
+    }
+
+    public float GetPercentBattery() {
+        return currentReport.percentBattery;
+    }
+
+    private void InitBatterStatusReceiver() {
+        BroadcastReceiver batteryReceiver = new BatteryStatusReceiver();
+        IntentFilter batteryFilter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+        batteryFilter.addAction(Intent.ACTION_BATTERY_LOW);
+        batteryFilter.addAction(Intent.ACTION_BATTERY_OKAY);
+        batteryFilter.addAction(Intent.ACTION_POWER_CONNECTED);
+        batteryFilter.addAction(Intent.ACTION_POWER_DISCONNECTED);
+        batteryFilter.addAction(BatteryStatusReceiver.INIT_BATTERY_INTENT);
+        batteryFilter.addAction(BatteryStatusReceiver.REQUEST_REPORT_INTENT);
+        MainActivity.mainContext.registerReceiver(batteryReceiver, batteryFilter);
+    }
+
+    public void UpdateStatus() {
+        if (SystemClock.elapsedRealtime() - lastStatusUpdate > minUpdateInterval) {
+            currentReport = new PowerReport(MainActivity.mainContext.registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED)));
+            lastStatusUpdate = SystemClock.elapsedRealtime();
+        }
+    }
+
+
+    public List<String> GetAwakeLocks() {
+        List<String> s = new ArrayList<String>();
+        if (wakeHolders.size() > 0) {
+
+            for (WakeHolder w : wakeHolders)
+                s.add(w.name);
+
+        }
+        return s;
     }
 
 
@@ -297,7 +371,38 @@ public class PowerState {
 
     private class PowerReport {
 
+        public final int voltage;
+        public final int temperature;
+        public final int status;
+        public final int health;
+        public final int maxBattery;
+        public final int currentBattery;
+        public final float percentBattery;
+
+        public final int capacity;
+        public final int charge;
+        public final int current;
+        public final int energy;
+
+        public PowerReport(Intent intent) {
+            voltage = intent.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0);
+            temperature = intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0);
+            status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, 0);
+            health = intent.getIntExtra(BatteryManager.EXTRA_HEALTH, 0);
+            maxBattery = intent.getIntExtra(BatteryManager.EXTRA_SCALE, 0);
+            currentBattery = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, 0);
+            percentBattery = (float) (currentBattery / maxBattery);
+
+            BatteryManager batteryManager = (BatteryManager) MainActivity.mainContext.getSystemService(Context.BATTERY_SERVICE);
+            capacity = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
+            charge = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER);
+            current = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_AVERAGE);
+            energy = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_ENERGY_COUNTER);
+
+
+        }
     }
+
 
     private class WakeException extends Exception {
     }
